@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# MemOS Proxy Launcher
+# Usage:
+#   memos              → interactive chat with qwen3-32b
+#   memos run deepseek-r1  → interactive chat with deepseek-r1
+#   memos list         → list available models
+#   memos serve        → just start the proxy server
+#   memos stop         → stop the proxy
+#   memos aider        → launch aider with qwen3-32b
+#   memos aider deepseek-r1 → launch aider with specific model
+
+PROXY_SCRIPT="$HOME/memos_proxy.py"
+PROXY_PID_FILE="/tmp/memos_proxy.pid"
+PROXY_LOG="/tmp/memos_proxy.log"
+PORT=11435
+HOST="http://localhost:$PORT"
+
+start_proxy() {
+    # Already running?
+    if [ -f "$PROXY_PID_FILE" ] && kill -0 "$(cat "$PROXY_PID_FILE")" 2>/dev/null; then
+        return 0
+    fi
+
+    # Start proxy in background
+    python "$PROXY_SCRIPT" > "$PROXY_LOG" 2>&1 &
+    echo $! > "$PROXY_PID_FILE"
+
+    # Wait for it to be ready
+    for i in $(seq 1 30); do
+        if curl -s "$HOST/" > /dev/null 2>&1; then
+            return 0
+        fi
+        sleep 0.3
+    done
+
+    echo "ERROR: Proxy failed to start. Check $PROXY_LOG"
+    cat "$PROXY_LOG"
+    return 1
+}
+
+stop_proxy() {
+    if [ -f "$PROXY_PID_FILE" ]; then
+        kill "$(cat "$PROXY_PID_FILE")" 2>/dev/null
+        rm -f "$PROXY_PID_FILE"
+        echo "Proxy stopped."
+    else
+        echo "Proxy not running."
+    fi
+}
+
+case "${1:-}" in
+    stop)
+        stop_proxy
+        ;;
+    serve)
+        start_proxy && echo "Proxy running on $HOST (PID $(cat "$PROXY_PID_FILE"))" && echo "Press Ctrl+C to stop" && tail -f "$PROXY_LOG"
+        ;;
+    list)
+        start_proxy && OLLAMA_HOST="$HOST" ollama list
+        ;;
+    aider)
+        MODEL="${2:-qwen3-32b}"
+        start_proxy && OPENAI_API_BASE="$HOST/v1" OPENAI_API_KEY=dummy aider --model "openai/$MODEL" "${@:3}"
+        ;;
+    run)
+        MODEL="${2:-qwen3-32b}"
+        start_proxy && OLLAMA_HOST="$HOST" ollama run "$MODEL" "${@:3}"
+        ;;
+    *)
+        # Default: interactive chat with qwen3-32b (or first arg as model)
+        MODEL="${1:-qwen3-32b}"
+        start_proxy && OLLAMA_HOST="$HOST" ollama run "$MODEL" "${@:2}"
+        ;;
+esac
