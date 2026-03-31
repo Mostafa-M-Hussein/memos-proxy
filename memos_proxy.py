@@ -48,7 +48,9 @@ import uvicorn
 app = FastAPI()
 
 MEMOS_URL = "https://memos.memtensor.cn/api/openmem/v1/chat"
-MEMOS_KEY = os.environ.get("MEMOS_API_KEY", "your-memos-api-key-here")
+MEMOS_KEY = os.environ.get("MEMOS_API_KEY", "")
+if not MEMOS_KEY:
+    raise SystemExit("MEMOS_API_KEY environment variable is required. Get yours from https://memos.memtensor.cn")
 PORT = 11435
 
 MODEL_MAP = {

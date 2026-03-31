@@ -4,11 +4,30 @@ Use MemOS hosted models (qwen3-32b, deepseek-r1, qwen2.5-72b-instruct) through t
 
 ## Setup
 
+### Docker (recommended)
+
 ```bash
-pip install fastapi uvicorn httpx
+# clone and run
+git clone https://github.com/Mostafa-M-Hussein/memos-proxy.git
+cd memos-proxy
+MEMOS_API_KEY=your-key-here docker compose up -d
 ```
 
-Edit `memos_proxy.py` and replace the API key with yours from [MemOS dashboard](https://memos.memtensor.cn).
+Or build and run directly:
+
+```bash
+docker build -t memos-proxy .
+docker run -d -p 11435:11435 -e MEMOS_API_KEY=your-key-here memos-proxy
+```
+
+Get your API key from [MemOS dashboard](https://memos.memtensor.cn).
+
+### Manual
+
+```bash
+pip install fastapi uvicorn httpx
+MEMOS_API_KEY=your-key-here python memos_proxy.py
+```
 
 ## Usage
 

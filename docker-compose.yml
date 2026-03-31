@@ -1,0 +1,8 @@
+services:
+  memos-proxy:
+    build: .
+    ports:
+      - "11435:11435"
+    environment:
+      - MEMOS_API_KEY=${MEMOS_API_KEY}
+    restart: unless-stopped
