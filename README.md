@@ -2,61 +2,76 @@
 
 Use MemOS hosted models (qwen3-32b, deepseek-r1, qwen2.5-72b-instruct) through the Ollama CLI or any OpenAI-compatible tool. No local GPU needed.
 
-## Setup
+## Prerequisites
 
-### Docker (recommended)
+- [Docker](https://docs.docker.com/get-docker/)
+- A MemOS API key from [memos.memtensor.cn](https://memos.memtensor.cn)
+- [Ollama CLI](https://ollama.com/download) (optional, for `ollama run` usage)
+- [aider](https://aider.chat/docs/install.html) (optional, `pip install aider-chat`)
+
+## Quick start
 
 ```bash
-# clone and run
 git clone https://github.com/Mostafa-M-Hussein/memos-proxy.git
 cd memos-proxy
-MEMOS_API_KEY=your-key-here docker compose up -d
+cp .env.example .env       # paste your MEMOS_API_KEY in .env
+docker compose up -d
 ```
 
-Or build and run directly:
+Or inline:
 
 ```bash
-docker build -t memos-proxy .
-docker run -d -p 11435:11435 -e MEMOS_API_KEY=your-key-here memos-proxy
+MEMOS_API_KEY=your-key docker compose up -d
 ```
 
-Get your API key from [MemOS dashboard](https://memos.memtensor.cn).
-
-### Manual
-
-```bash
-pip install fastapi uvicorn httpx
-MEMOS_API_KEY=your-key-here python memos_proxy.py
-```
+The proxy is now running on `http://localhost:11435`.
 
 ## Usage
 
+### Ollama CLI
+
 ```bash
-# interactive chat
-./memos
+OLLAMA_HOST=http://localhost:11435 ollama run qwen3-32b
+OLLAMA_HOST=http://localhost:11435 ollama run deepseek-r1
+OLLAMA_HOST=http://localhost:11435 ollama list
+```
 
-# pick a model
-./memos deepseek-r1
+### aider
 
-# one-shot
-./memos run qwen3-32b "explain monads"
+```bash
+OPENAI_API_BASE=http://localhost:11435/v1 OPENAI_API_KEY=dummy aider --model openai/qwen3-32b
+```
 
-# list models
-./memos list
+### curl (OpenAI format)
 
-# use with aider
-./memos aider
-./memos aider deepseek-r1
+```bash
+curl http://localhost:11435/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"qwen3-32b","messages":[{"role":"user","content":"hello"}]}'
+```
 
-# just the proxy server
-./memos serve
-./memos stop
+### curl (Ollama format)
+
+```bash
+curl http://localhost:11435/api/chat \
+  -d '{"model":"qwen3-32b","messages":[{"role":"user","content":"hello"}]}'
+```
+
+### Open WebUI
+
+Set Ollama URL to `http://localhost:11435`.
+
+### Manual (without Docker)
+
+```bash
+pip install fastapi uvicorn httpx
+MEMOS_API_KEY=your-key python memos_proxy.py
 ```
 
 ## How it works
 
 ```
-ollama run qwen3-32b
+your tool (ollama, aider, curl, etc.)
        │
        ▼
 ┌──────────────┐     ┌──────────────┐
