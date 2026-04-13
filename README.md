@@ -5,7 +5,7 @@ Use MemOS hosted models (qwen3-32b, deepseek-r1, qwen2.5-72b-instruct) through t
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/)
-- A MemOS API key from [memos.memtensor.cn](https://memos.memtensor.cn)
+- A MemOS API key from [memos](memos-dashboard.openmem.net)
 - [Ollama CLI](https://ollama.com/download) (optional, for `ollama run` usage)
 - [aider](https://aider.chat/docs/install.html) (optional, `pip install aider-chat`)
 
