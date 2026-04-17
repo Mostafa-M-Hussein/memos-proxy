@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "weather": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "./mock-weather-mcp-server",
+        "run",
+        "main.py"
+      ],
+      "env": {
+        "MCP_LOG_LEVEL": "ERROR"
+      }
+    }
+  }
+}

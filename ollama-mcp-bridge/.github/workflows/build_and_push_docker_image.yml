@@ -1,0 +1,111 @@
+name: 'Build and Push Docker Image'
+description: |
+  This workflow runs on every release.
+  It builds and publishes a new Docker image and pushes that image to the GitHub Container Registry (ghcr.io)
+
+on:
+  release:
+    types:
+      - created
+
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        type: string
+        required: true
+        description: 'Name of the tag to use for publish (ex. v1.0.0)'
+
+env:
+  IMAGE_NAME: 'ollama-mcp-bridge'
+
+jobs:
+  validate-version-tag:
+    name: 'Validate Version Tag'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Validate PEP 440 version format'
+        run: |
+          RAW="${{ github.event.release.tag_name || inputs.tag_name }}"
+          VERSION=$(echo "$RAW" | sed 's/^v//')
+          if ! echo "$VERSION" | grep -Pq '^([1-9][0-9]*!)?[0-9]+(\.[0-9]+)*(((a|b|rc)[0-9]+)|(\.post[0-9]+)|(\.dev[0-9]+))?$'; then
+            echo "::error::Tag '$RAW' is not a valid PEP 440 version!%0ACheck: https://peps.python.org/pep-0440/#public-version-identifiers%0AValid examples: v1.0.0, v1.0.0a1, v1.0.0rc1, v1.0.0.post1, v1.0.0.dev1"
+            exit 1
+          fi
+          echo -e "\x1b[1;32mTag '$RAW' is PEP 440 compliant."
+
+  build-and-push:
+    name: 'Build and Push Multi-Arch Image'
+    runs-on: ubuntu-latest
+    needs: [ 'validate-version-tag' ]
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: 'Checkout repository'
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: 'Set up QEMU'
+        uses: docker/setup-qemu-action@v3
+
+      - name: 'Set up Docker Buildx'
+        uses: docker/setup-buildx-action@v3
+
+      - name: 'Docker login'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 'Docker metadata'
+        id: meta
+        uses: docker/metadata-action@v5
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
+            type=raw,value=${{ github.event.release.tag_name || inputs.tag_name }}
+            type=sha,format=long
+          labels: |
+            org.opencontainers.image.description=Extend the Ollama API with dynamic AI tool integration from multiple MCP (Model Context Protocol) servers. Fully compatible, transparent, and developer-friendly, ideal for building powerful local LLM applications, AI agents, and custom chatbots
+
+      - name: 'Build and push'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          build-args: |
+            VERSION=${{ github.event.release.tag_name || inputs.tag_name }}
+
+          provenance: false # Prevents unknown/unknown Attestation Manifests
+          sbom: false # Prevents SBOM Manifests
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  verify-manifest:
+    name: 'Verify manifest'
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    steps:
+      - name: 'Verify'
+        run: |
+          TAG="${{ github.event.release.tag_name || inputs.tag_name }}"
+          IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${{ env.IMAGE_NAME }}:${TAG}
+          OUTPUT=$(docker buildx imagetools inspect $IMAGE)
+          echo "$OUTPUT"
+          for arch in amd64 arm64; do
+            if ! echo "$OUTPUT" | grep -q "$arch"; then
+              echo -e "\x1b[1;31mPlatform $arch is missing in manifest."
+              exit 1
+            fi
+          done
+          echo -e "\x1b[1;32mAll expected platforms found in manifest."
