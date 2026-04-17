@@ -2,7 +2,38 @@ services:
   memos-proxy:
     build: .
     ports:
-      - "11435:11435"
+      - "127.0.0.1:11435:11435"
     environment:
       - MEMOS_API_KEY=${MEMOS_API_KEY}
     restart: unless-stopped
+
+  ollama-mcp-bridge:
+    build:
+      context: ./ollama-mcp-bridge
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:11436:8000"
+    environment:
+      - OLLAMA_URL=http://memos-proxy:11435
+      - CORS_ORIGINS=*
+    volumes:
+      - ./mcp-config.json:/root/mcp-config.json
+    depends_on:
+      - memos-proxy
+    restart: unless-stopped
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    ports:
+      - "127.0.0.1:3333:8080"
+    environment:
+      - OLLAMA_BASE_URL=http://ollama-mcp-bridge:8000
+      - WEBUI_AUTH=false
+    volumes:
+      - open-webui-data:/app/backend/data
+    depends_on:
+      - ollama-mcp-bridge
+    restart: unless-stopped
+
+volumes:
+  open-webui-data:

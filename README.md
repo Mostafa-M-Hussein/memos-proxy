@@ -1,39 +1,77 @@
 # memos-proxy
 
-Use MemOS hosted models (qwen3-32b, deepseek-r1, qwen2.5-72b-instruct) through the Ollama CLI or any OpenAI-compatible tool. No local GPU needed.
+Use MemOS hosted models (qwen3-32b, deepseek-r1, qwen2.5-72b-instruct) through Open WebUI, OpenClaw, the Ollama CLI, or any OpenAI-compatible tool. No local GPU needed.
 
 ## Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/)
-- A MemOS API key from [memos](https://memos-dashboard.openmem.net)
-- [Ollama CLI](https://ollama.com/download) (optional, for `ollama run` usage)
-- [aider](https://aider.chat/docs/install.html) (optional, `pip install aider-chat`)
-- [quick tutoria](https://www.youtube.com/watch?v=yxduL_jMHpA&feature=youtu.be)  if u stuck 
+Install these manually before running the setup script:
+
+| # | What | How |
+|---|------|-----|
+| 1 | **Docker** | [docs.docker.com/get-docker](https://docs.docker.com/get-docker/) |
+| 2 | **Ollama** | [ollama.com/download](https://ollama.com/download) |
+| 3 | **OpenClaw** | After Ollama is installed: `ollama launch openclaw` |
+| 4 | **MemOS API key** | Sign up at [memos-dashboard.openmem.net](https://memos-dashboard.openmem.net) |
+
+Everything else is handled by the setup script. Stuck? [quick tutorial](https://www.youtube.com/watch?v=yxduL_jMHpA&feature=youtu.be)
 ## Quick start
 
 ```bash
 git clone https://github.com/Mostafa-M-Hussein/memos-proxy.git
 cd memos-proxy
-cp .env.example .env       # paste your MEMOS_API_KEY in .env
-docker compose up -d
 ```
 
-Or inline:
-
+**macOS / Linux**
 ```bash
-MEMOS_API_KEY=your-key docker compose up -d
+cp .env.example .env        # paste your MEMOS_API_KEY
+./setup.sh
 ```
 
-The proxy is now running on `http://localhost:11435`.
+**Windows (PowerShell)**
+```powershell
+copy .env.example .env      # paste your MEMOS_API_KEY
+.\setup.ps1
+```
 
-## Usage
+> First run? If PowerShell blocks the script:
+> `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
+
+That's it. The script will:
+1. Start all Docker services
+2. Install and start OpenClaw (via `ollama launch openclaw`), pre-configured to use Memos models
+
+## Services
+
+| Service | URL | What it does |
+|---------|-----|--------------|
+| open-webui | http://localhost:3333 | Browser chat UI |
+| ollama-mcp-bridge | http://localhost:11436 | Memos models + MCP tool support |
+| memos-proxy | http://localhost:11435 | Raw Ollama-compatible API |
+
+Your local Ollama stays on `11434` — no conflicts.
+
+## Architecture
+
+```
+open-webui (browser)
+      │
+      ▼
+ollama-mcp-bridge :11436  ◄── OpenClaw (messaging: WhatsApp/Telegram/Slack)
+      │
+      ▼
+memos-proxy :11435
+      │
+      ▼
+MemOS Cloud  (qwen3-32b · deepseek-r1 · qwen2.5-72b-instruct)
+```
+
+## Manual usage
 
 ### Ollama CLI
 
 ```bash
-OLLAMA_HOST=http://localhost:11435 ollama run qwen3-32b
-OLLAMA_HOST=http://localhost:11435 ollama run deepseek-r1
-OLLAMA_HOST=http://localhost:11435 ollama list
+OLLAMA_HOST=http://localhost:11436 ollama run qwen3-32b
+OLLAMA_HOST=http://localhost:11436 ollama list
 ```
 
 ### aider
@@ -42,49 +80,18 @@ OLLAMA_HOST=http://localhost:11435 ollama list
 OPENAI_API_BASE=http://localhost:11435/v1 OPENAI_API_KEY=dummy aider --model openai/qwen3-32b
 ```
 
-### curl (OpenAI format)
-
-```bash
-curl http://localhost:11435/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{"model":"qwen3-32b","messages":[{"role":"user","content":"hello"}]}'
-```
-
-### curl (Ollama format)
+### curl
 
 ```bash
 curl http://localhost:11435/api/chat \
   -d '{"model":"qwen3-32b","messages":[{"role":"user","content":"hello"}]}'
 ```
 
-### Open WebUI
-
-Set Ollama URL to `http://localhost:11435`.
-
-### Manual (without Docker)
+## Stop everything
 
 ```bash
-pip install fastapi uvicorn httpx
-MEMOS_API_KEY=your-key python memos_proxy.py
+docker compose down && openclaw gateway stop
 ```
-
-## How it works
-
-```
-your tool (ollama, aider, curl, etc.)
-       │
-       ▼
-┌──────────────┐     ┌──────────────┐
-│ memos_proxy  │────▶│ MemOS Cloud  │
-│ localhost    │◀────│ (runs model) │
-└──────────────┘     └──────────────┘
-       │
-       ▼
-  response back
-  to your terminal
-```
-
-The proxy translates Ollama/OpenAI API calls into MemOS format. Your machine does zero inference.
 
 ## Models
 
